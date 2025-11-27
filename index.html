@@ -3,25 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teach AI</title>
+    <title>Teach AI - Web Version</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-    <!-- BIBLIOTECAS MÁGICAS (Supabase, PDF.js, Google AI) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script type="importmap">
       {
         "imports": {
-          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+          "@google/generative-ai": "https://esm.run/@google/generative-ai",
+          "@supabase/supabase-js": "https://esm.run/@supabase/supabase-js"
         }
       }
     </script>
@@ -30,565 +24,446 @@
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .modal-overlay { transition: opacity 0.3s ease; }
         .modal-container { transition: transform 0.3s ease, opacity 0.3s ease; transform: scale(0.95); opacity: 0; }
         .modal-container.active { transform: scale(1); opacity: 1; }
-        #app-wrapper { width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; }
-        #app-container { width: 100%; height: 100%; max-height: 100vh; display: flex; flex-direction: column; background-color: #ffffff; }
+        
         @media (min-width: 768px) {
-            #app-container { max-width: 1100px; height: 90vh; max-height: 850px; border-radius: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); flex-direction: row; }
-            #sidebar { width: 288px; border-radius: 1.5rem 0 0 1.5rem; }
-            #main-content-wrapper { border-radius: 0 1.5rem 1.5rem 0; }
+            #app-container {
+                width: 100%; max-width: 1100px; height: 90vh; max-height: 850px;
+                border-radius: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                flex-direction: row;
+            }
+            #sidebar { position: static; transform: translateX(0); width: 288px; }
         }
     </style>
 </head>
-<body class="overflow-hidden">
+<body class="overflow-hidden h-screen flex items-center justify-center">
 
-    <div id="app-wrapper">
-        <div id="app-container" class="overflow-hidden relative">
+    <div id="app-wrapper" class="w-full h-full flex items-center justify-center">
+        <div id="app-container" class="w-full h-full bg-white flex flex-col relative overflow-hidden">
 
-            <!-- SIDEBAR -->
-            <div id="sidebar" class="absolute md:relative top-0 left-0 h-full w-72 bg-gray-800 text-white transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-30 p-6 flex flex-col">
+            <div id="sidebar" class="absolute md:relative top-0 left-0 h-full w-72 bg-gray-800 text-white transform -translate-x-full md:translate-x-0 transition-transform duration-300 z-30 p-6 flex flex-col">
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-white">Teach AI</h2>
-                    <button onclick="startNewConversation()" title="Nova Conversa" class="p-2 rounded-full hover:bg-gray-700"><i class="fas fa-plus"></i></button>
+                    <h2 class="text-2xl font-bold">Teach AI</h2>
+                    <button onclick="window.app.startNewConversation()" class="p-2 rounded-full hover:bg-gray-700"><i class="fas fa-plus"></i></button>
                 </div>
-                
                 <h3 class="text-sm font-semibold text-gray-400 uppercase mb-2">Histórico</h3>
-                <div id="history-list" class="flex-grow overflow-y-auto space-y-2 pr-2">
-                    <p class="text-gray-500 text-sm italic p-2">Carregando...</p>
-                </div>
-                
+                <div id="history-list" class="flex-grow overflow-y-auto space-y-2 pr-2 text-sm text-gray-500">Carregando...</div>
                 <div class="border-t border-gray-600 pt-4 mt-4 space-y-2">
-                     <button onclick="showScreen('dev-screen')" class="w-full text-left flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700 transition-colors">
-                        <i class="fas fa-tools w-5 text-center"></i><span>Base de Conhecimento</span>
-                    </button>
-                    <button onclick="showScreen('config-screen')" class="w-full text-left flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700 transition-colors">
-                       <i class="fas fa-key w-5 text-center"></i><span>Configurar API</span>
-                    </button>
+                    <button onclick="window.app.showScreen('dev-screen')" class="w-full text-left p-2 hover:bg-gray-700 rounded flex gap-3"><i class="fas fa-tools w-5"></i> Configurações</button>
+                    <button onclick="window.app.showScreen('start-screen')" class="w-full text-left p-2 hover:bg-gray-700 rounded flex gap-3"><i class="fas fa-sign-out-alt w-5"></i> Sair</button>
                 </div>
             </div>
 
-            <div id="main-content-wrapper" class="relative flex flex-col w-full h-full bg-gray-50">
-                <div id="sidebar-overlay" class="hidden md:hidden absolute inset-0 bg-black bg-opacity-50 z-20" onclick="toggleSidebar()"></div>
-                
-                <div id="main-content" class="flex-grow">
-                    <!-- SCREEN 1: START -->
-                    <div id="start-screen" class="flex flex-col h-full p-8 text-center bg-white">
-                        <div class="flex-grow flex flex-col items-center justify-center">
-                            <div class="w-48 h-48 bg-indigo-100 rounded-full flex items-center justify-center mb-8">
-                                <i class="fas fa-robot text-7xl text-indigo-500"></i>
-                            </div>
-                            <h1 class="text-4xl font-bold text-gray-800">Bem-vindo ao Teach AI</h1>
-                            <p class="text-gray-500 mt-2 text-lg">Seu assistente de estudos pessoal.</p>
-                        </div>
-                        <button onclick="startNewConversation()" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
-                            Começar <i class="fas fa-arrow-right"></i>
-                        </button>
-                    </div>
+            <div class="relative flex flex-col w-full h-full bg-gray-50 flex-grow">
+                <div id="sidebar-overlay" class="hidden absolute inset-0 bg-black bg-opacity-50 z-20 md:hidden" onclick="window.app.toggleSidebar()"></div>
 
-                    <!-- SCREEN 2: INITIAL CHAT -->
-                    <div id="chat-initial-screen" class="hidden flex-col h-full">
-                        <header class="flex items-center p-4 border-b border-gray-200 flex-shrink-0">
-                            <button onclick="toggleSidebar()" class="p-2 rounded-full hover:bg-gray-100 md:hidden"><i class="fas fa-bars text-gray-700"></i></button>
-                            <div class="text-center flex-grow">
-                                <h2 class="font-semibold text-gray-800">Nova Conversa</h2>
-                                <p id="subject-header-text" class="text-xs text-green-600 font-semibold">Geral</p>
-                            </div>
-                            <div class="w-8"></div>
-                        </header>
-                        <main class="flex-grow flex flex-col items-center justify-center p-4 text-center">
-                            <i class="fas fa-comments text-5xl text-gray-300 mb-4"></i>
-                            <h3 class="text-xl font-semibold text-gray-700">Como posso ajudar?</h3>
-                            <p class="text-gray-400">Selecione uma matéria e faça sua pergunta.</p>
-                        </main>
-                        <footer class="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
-                            <div class="flex justify-center gap-4 mb-3">
-                                <button onclick="showModal('subject-modal')" class="text-sm text-indigo-600 hover:underline font-medium"><i class="fas fa-book mr-1"></i><span id="subject-btn-text">Matéria</span></button>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <textarea id="initial-chat-input" placeholder="Digite sua dúvida aqui..." class="w-full p-3 bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" rows="1"></textarea>
-                                <button onclick="startNewChat()" class="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 transition-colors"><i class="fas fa-paper-plane"></i></button>
-                            </div>
-                        </footer>
-                    </div>
-
-                    <!-- SCREEN 3: ACTIVE CHAT -->
-                    <div id="chat-conversa-screen" class="hidden flex-col h-full">
-                        <header class="flex items-center p-4 border-b border-gray-200 flex-shrink-0">
-                             <button onclick="toggleSidebar()" class="p-2 rounded-full hover:bg-gray-100 md:hidden"><i class="fas fa-bars text-gray-700"></i></button>
-                            <div class="text-center flex-grow">
-                                <h2 class="font-semibold text-gray-800">Conversa Ativa</h2>
-                                <p id="subject-header-text-chat" class="text-xs text-green-600 font-semibold">Geral</p>
-                            </div>
-                            <div class="w-8"></div>
-                        </header>
-                        <main id="chat-body" class="flex-grow p-4 overflow-y-auto no-scrollbar space-y-4">
-                            <!-- Messages go here -->
-                        </main>
-                        <footer class="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
-                             <div class="flex justify-center gap-4 mb-3">
-                                <button onclick="showModal('subject-modal')" class="text-sm text-indigo-600 hover:underline font-medium"><i class="fas fa-book mr-1"></i><span id="subject-btn-text-convo">Matéria</span></button>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <textarea id="chat-conversa-input" placeholder="Faça outra pergunta..." class="w-full p-3 bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" rows="1"></textarea>
-                                <button onclick="sendMessage()" class="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 transition-colors"><i class="fas fa-paper-plane"></i></button>
-                            </div>
-                        </footer>
-                    </div>
-
-                    <!-- SCREEN 4: DEVELOPER (DOCS) -->
-                    <div id="dev-screen" class="hidden flex-col h-full">
-                        <header class="flex items-center p-4 border-b border-gray-200 flex-shrink-0">
-                            <button onclick="goBack()" class="p-2 rounded-full hover:bg-gray-100"><i class="fas fa-arrow-left text-gray-700"></i></button>
-                            <h2 class="font-semibold text-gray-800 flex-grow text-center">Gestão de Documentos</h2>
-                            <div class="w-8"></div>
-                        </header>
-                        <main class="flex-grow p-6 space-y-6 overflow-y-auto">
-                            <div class="bg-white p-4 rounded-lg shadow-sm border">
-                                <h3 class="font-semibold text-lg mb-2">📚 Upload de Livros (PDF)</h3>
-                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center relative">
-                                    <input type="file" id="pdf-upload" accept=".pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFileUpload(this)">
-                                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-2"></i>
-                                    <p class="text-gray-600">Clique ou arraste um PDF aqui.</p>
-                                    <p class="text-xs text-gray-400 mt-1">Salvo automaticamente na nuvem.</p>
-                                </div>
-                            </div>
-                            <div class="bg-white p-4 rounded-lg shadow-sm border">
-                                <div class="flex justify-between items-center mb-3">
-                                    <h3 class="font-semibold text-lg">📄 Documentos na Nuvem</h3>
-                                    <button onclick="clearSystem()" class="text-xs text-red-500 hover:underline">Resetar Tudo</button>
-                                </div>
-                                <div id="documents-list" class="space-y-2">
-                                    <p class="text-gray-500 italic">Carregando...</p>
-                                </div>
-                            </div>
-                        </main>
-                    </div>
-
-                     <!-- SCREEN 5: CONFIG -->
-                     <div id="config-screen" class="hidden flex-col h-full">
-                        <header class="flex items-center p-4 border-b border-gray-200 flex-shrink-0">
-                            <button onclick="goBack()" class="p-2 rounded-full hover:bg-gray-100"><i class="fas fa-arrow-left text-gray-700"></i></button>
-                            <h2 class="font-semibold text-gray-800 flex-grow text-center">Configurações</h2>
-                            <div class="w-8"></div>
-                        </header>
-                        <main class="flex-grow p-6 flex flex-col items-center justify-center">
-                            <div class="bg-white p-6 rounded-lg shadow-sm border w-full max-w-md">
-                                <h3 class="font-semibold text-lg mb-2">Chave da API (Gemini)</h3>
-                                <p class="text-sm text-gray-600 mb-3">Necessário para o Teach AI funcionar.</p>
-                                <input id="api-key-input" type="password" placeholder="Cole sua chave AIza..." class="w-full p-2 border rounded-md mb-4">
-                                <button onclick="saveApiKey()" class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700">Salvar</button>
-                            </div>
-                        </main>
-                    </div>
+                <div id="start-screen" class="flex flex-col h-full p-8 text-center bg-white items-center justify-center">
+                    <div class="w-48 h-48 bg-indigo-100 rounded-full flex items-center justify-center mb-8"><i class="fas fa-robot text-7xl text-indigo-500"></i></div>
+                    <h1 class="text-4xl font-bold text-gray-800">Teach AI Web</h1>
+                    <p class="text-gray-500 mt-2 text-lg">Seu assistente pessoal, direto no navegador.</p>
+                    <button onclick="window.app.startNewConversation()" class="mt-8 bg-indigo-600 text-white py-3 px-8 rounded-xl font-semibold hover:bg-indigo-700 transition">Começar</button>
                 </div>
-                
-                <!-- MODALS -->
-                <div id="modal-overlay" class="hidden absolute inset-0 bg-black bg-opacity-50 z-40 modal-overlay" onclick="hideAllModals()"></div>
-                <div id="subject-modal" class="hidden absolute inset-0 z-50 flex items-center justify-center p-4">
-                    <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-xs modal-container">
-                        <h3 class="text-lg font-semibold text-center mb-4">Escolha a matéria</h3>
-                        <div class="space-y-2" id="subject-options">
-                            <!-- Populated by JS -->
+
+                <div id="chat-screen" class="hidden flex-col h-full">
+                    <header class="flex items-center p-4 border-b bg-white">
+                        <button onclick="window.app.toggleSidebar()" class="md:hidden mr-4"><i class="fas fa-bars"></i></button>
+                        <div class="flex-grow text-center">
+                            <h2 class="font-semibold">Chat</h2>
+                            <p id="chat-subject-text" class="text-xs text-green-600">Geral</p>
                         </div>
-                    </div>
+                    </header>
+                    <main id="chat-body" class="flex-grow p-4 overflow-y-auto space-y-4"></main>
+                    <footer class="p-4 bg-white border-t">
+                        <div class="flex justify-center gap-2 mb-3 text-sm overflow-x-auto">
+                            <button onclick="window.app.showModal('subject-modal')" class="text-indigo-600 font-medium px-2"><i class="fas fa-book"></i> Matéria</button>
+                            <button onclick="window.app.showModal('style-modal')" class="text-indigo-600 font-medium px-2"><i class="fas fa-lightbulb"></i> Estilo</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <input id="chat-input" type="text" class="flex-grow p-3 bg-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Digite sua mensagem...">
+                            <button onclick="window.app.sendMessage()" class="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </footer>
+                </div>
+
+                <div id="dev-screen" class="hidden flex-col h-full bg-gray-50">
+                    <header class="p-4 border-b bg-white flex items-center">
+                        <button onclick="window.app.goBack()" class="mr-4"><i class="fas fa-arrow-left"></i></button>
+                        <h2 class="font-bold">Configurações</h2>
+                    </header>
+                    <main class="p-6 space-y-6 overflow-y-auto">
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <h3 class="font-bold mb-2">🧠 Google Gemini API</h3>
+                            <input id="api-key-input" type="password" placeholder="Cole sua API Key do Google AI Studio" class="w-full p-2 border rounded mb-2">
+                            <button onclick="window.app.saveSettings()" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm">Salvar Key</button>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <h3 class="font-bold mb-2">🗄️ Conexão Supabase</h3>
+                            <p class="text-xs text-gray-500 mb-2">Necessário para salvar histórico e PDFs.</p>
+                            <input id="supabase-url" placeholder="Supabase URL (https://...)" class="w-full p-2 border rounded mb-2">
+                            <input id="supabase-key" type="password" placeholder="Supabase Anon Key" class="w-full p-2 border rounded mb-2">
+                            <button onclick="window.app.saveSettings()" class="bg-green-600 text-white px-4 py-2 rounded text-sm">Conectar</button>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <h3 class="font-bold mb-2">📄 Arquivos (PDF)</h3>
+                            <div class="border-2 border-dashed p-4 text-center rounded mb-2 cursor-pointer" onclick="document.getElementById('pdf-upload').click()">
+                                <input type="file" id="pdf-upload" accept=".pdf" class="hidden" multiple onchange="window.app.handleFileUpload(this)">
+                                <p class="text-gray-500 text-sm">Clique para adicionar PDFs</p>
+                            </div>
+                            <div id="file-list" class="space-y-2"></div>
+                        </div>
+                    </main>
                 </div>
             </div>
+
+            <div id="modal-overlay" class="hidden absolute inset-0 bg-black bg-opacity-50 z-40" onclick="window.app.hideModals()"></div>
+            
+            <div id="subject-modal" class="hidden absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+                <div class="bg-white rounded-xl p-6 w-64 shadow-xl pointer-events-auto modal-container">
+                    <h3 class="font-bold text-center mb-4">Escolha a Matéria</h3>
+                    <div id="subject-list" class="space-y-2"></div>
+                </div>
+            </div>
+
+             <div id="style-modal" class="hidden absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+                <div class="bg-white rounded-xl p-6 w-64 shadow-xl pointer-events-auto modal-container">
+                    <h3 class="font-bold text-center mb-4">Estilo de Resposta</h3>
+                    <button onclick="window.app.setAnswerStyle(false)" class="w-full p-2 bg-gray-100 rounded mb-2 hover:bg-gray-200">💡 Dica / Guia</button>
+                    <button onclick="window.app.setAnswerStyle(true)" class="w-full p-2 bg-gray-100 rounded hover:bg-gray-200">✅ Resposta Completa</button>
+                </div>
+            </div>
+
         </div>
     </div>
 
-    <!-- LÓGICA DO SISTEMA -->
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
+        import { createClient } from "@supabase/supabase-js";
 
-        // ========================================================
-        // 1. CONSTANTES DO SUPABASE (COLOQUE SEUS DADOS AQUI)
-        // ========================================================
-        const SUPABASE_URL = 'https://kjzoepvglthrhmwmpqay.supabase.co'; 
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtqem9lcHZnbHRocmhtd21wcWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyMTEwOTksImV4cCI6MjA3OTc4NzA5OX0.9laD9f5PAhXND0E8JuhqmElS-RqEMb-_83CqP5VIXtI';
-        
-        const BUCKET_NAME = 'arquivos-teach-ai';
-        const STORAGE_FILE = 'system/teach_ai_data.json'; // Arquivo único que guarda TUDO (Docs + Histórico)
-
-        // Estado Local
-        let state = {
-            chatHistory: {}, // { id: [mensagens] }
-            knowledgeBase: {}, // { "livro.pdf": "texto..." }
-            currentConversationId: null,
-            selectedSubject: 'Geral',
-            apiKey: localStorage.getItem('geminiApiKey') || ''
+        // --- Estado da Aplicação ---
+        const state = {
+            geminiKey: localStorage.getItem('gemini_key') || '',
+            supabaseUrl: localStorage.getItem('sb_url') || '',
+            supabaseKey: localStorage.getItem('sb_key') || '',
+            currentScreen: 'start-screen',
+            activeConversationId: null,
+            messages: [],
+            files: [], // Lista de objetos { name, data: 'base64string...', type: 'application/pdf' }
+            config: {
+                subject: 'Geral',
+                giveFinal: false
+            },
+            subjects: ['Matemática', 'Física', 'Química', 'História', 'Português', 'Inglês', 'Programação']
         };
 
-        // Inicialização Supabase
+        // --- Inicialização de Clientes ---
         let supabase = null;
-        if(SUPABASE_URL && !SUPABASE_URL.includes('SUA_URL')) {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        }
-
         let genAI = null;
 
-        // ========================================================
-        // 2. INICIALIZAÇÃO
-        // ========================================================
-        window.addEventListener('load', async () => {
-            if(state.apiKey) initGemini(state.apiKey);
-            
-            // Carregar dados da nuvem
-            if(supabase) {
-                await loadSystemFromCloud();
-            } else {
-                console.warn("Supabase não configurado.");
+        function initClients() {
+            if (state.supabaseUrl && state.supabaseKey) {
+                try {
+                    supabase = createClient(state.supabaseUrl, state.supabaseKey);
+                    loadHistory();
+                } catch (e) { console.error("Erro Supabase", e); }
             }
-
-            setupUI();
-            showScreen('start-screen');
-        });
-
-        // ========================================================
-        // 3. PERSISTÊNCIA (SUPABASE)
-        // ========================================================
-        async function loadSystemFromCloud() {
-            renderDocsList(true); // Loading state
-            try {
-                const { data, error } = await supabase.storage.from(BUCKET_NAME).download(STORAGE_FILE);
-                if (!error) {
-                    const text = await data.text();
-                    const cloudData = JSON.parse(text);
-                    state.knowledgeBase = cloudData.knowledgeBase || {};
-                    state.chatHistory = cloudData.chatHistory || {};
-                    console.log("Dados carregados da nuvem.");
-                }
-            } catch (e) {
-                console.log("Nenhum dado prévio ou erro:", e);
+            if (state.geminiKey) {
+                genAI = new GoogleGenerativeAI(state.geminiKey);
             }
-            renderDocsList();
-            renderHistoryList();
+            updateConfigUI();
         }
 
-        async function saveSystemToCloud() {
-            if(!supabase) return;
-            // Salva docs e histórico num único arquivo JSON
-            const payload = {
-                knowledgeBase: state.knowledgeBase,
-                chatHistory: state.chatHistory
-            };
-            const blob = new Blob([JSON.stringify(payload)], {type : 'application/json'});
-            await supabase.storage.from(BUCKET_NAME).upload(STORAGE_FILE, blob, {
-                contentType: 'application/json', upsert: true
+        // --- UI Helpers ---
+        const el = (id) => document.getElementById(id);
+        
+        const ui = {
+            showScreen: (screenId) => {
+                ['start-screen', 'chat-screen', 'dev-screen'].forEach(id => el(id).classList.add('hidden'));
+                ['start-screen', 'chat-screen', 'dev-screen'].forEach(id => el(id).classList.remove('flex'));
+                
+                const target = el(screenId);
+                target.classList.remove('hidden');
+                target.classList.add('flex');
+                state.currentScreen = screenId;
+                
+                if(screenId === 'chat-screen') renderChat();
+                if(window.innerWidth < 768) ui.toggleSidebar(false);
+            },
+            toggleSidebar: (force) => {
+                const sb = el('sidebar');
+                const overlay = el('sidebar-overlay');
+                const isOpen = !sb.classList.contains('-translate-x-full');
+                const shouldOpen = force !== undefined ? force : !isOpen;
+                
+                if (shouldOpen) {
+                    sb.classList.remove('-translate-x-full');
+                    overlay.classList.remove('hidden');
+                } else {
+                    sb.classList.add('-translate-x-full');
+                    overlay.classList.add('hidden');
+                }
+            },
+            showModal: (id) => {
+                el('modal-overlay').classList.remove('hidden');
+                const m = el(id);
+                m.classList.remove('hidden');
+                setTimeout(() => m.querySelector('.modal-container').classList.add('active'), 10);
+            },
+            hideModals: () => {
+                el('modal-overlay').classList.add('hidden');
+                document.querySelectorAll('[id$="-modal"]').forEach(m => {
+                    m.querySelector('.modal-container')?.classList.remove('active');
+                    setTimeout(() => m.classList.add('hidden'), 300);
+                });
+            }
+        };
+
+        // --- File Handling (Converte PDF para Base64 para envio inline) ---
+        async function fileToGenerativePart(file) {
+            const base64EncodedDataPromise = new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.readAsDataURL(file);
             });
-            console.log("Sistema salvo na nuvem.");
+            return {
+                inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
+            };
         }
 
-        window.clearSystem = async () => {
-            if(confirm("Isso apagará todos os livros e conversas para todos os usuários. Confirmar?")) {
-                state.knowledgeBase = {};
-                state.chatHistory = {};
-                await saveSystemToCloud();
-                renderDocsList();
-                renderHistoryList();
-                alert("Sistema resetado.");
-            }
-        };
+        // --- Lógica Principal ---
 
-        // ========================================================
-        // 4. LÓGICA DE DOCUMENTOS (PDF)
-        // ========================================================
-        window.handleFileUpload = async (input) => {
-            const file = input.files[0];
-            if (!file) return;
+        window.app = {
+            // Navegação
+            showScreen: ui.showScreen,
+            toggleSidebar: ui.toggleSidebar,
+            showModal: ui.showModal,
+            hideModals: ui.hideModals,
+            goBack: () => ui.showScreen('start-screen'),
 
-            const listDiv = document.getElementById('documents-list');
-            listDiv.innerHTML = `<div class="p-3 bg-indigo-50 text-indigo-700 rounded animate-pulse">Lendo PDF e salvando...</div>`;
+            // Configuração
+            saveSettings: () => {
+                const gKey = el('api-key-input').value.trim();
+                const sUrl = el('supabase-url').value.trim();
+                const sKey = el('supabase-key').value.trim();
 
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                let fullText = "";
+                if(gKey) localStorage.setItem('gemini_key', gKey);
+                if(sUrl) localStorage.setItem('sb_url', sUrl);
+                if(sKey) localStorage.setItem('sb_key', sKey);
                 
-                // Extrair texto (Limitado a 50 paginas para não travar navegador)
-                const maxPages = Math.min(pdf.numPages, 50); 
-                for (let i = 1; i <= maxPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const content = await page.getTextContent();
-                    fullText += content.items.map(item => item.str).join(" ") + "\n";
+                state.geminiKey = gKey || state.geminiKey;
+                state.supabaseUrl = sUrl || state.supabaseUrl;
+                state.supabaseKey = sKey || state.supabaseKey;
+                
+                initClients();
+                alert('Configurações Salvas!');
+            },
+
+            // Upload de Arquivos
+            handleFileUpload: async (input) => {
+                if (!input.files.length) return;
+                
+                // Salvar no estado local (para mandar para o Gemini)
+                for (const file of input.files) {
+                    const part = await fileToGenerativePart(file);
+                    state.files.push({
+                        name: file.name,
+                        part: part
+                    });
+                    
+                    // Backup no Supabase (se configurado)
+                    if (supabase) {
+                        try {
+                            const { error } = await supabase.storage.from('teach-ai').upload(`pdfs/${Date.now()}_${file.name}`, file);
+                            if(error) console.error("Upload erro Supabase", error);
+                        } catch(e) {}
+                    }
+                }
+                renderFileList();
+            },
+
+            removeFile: (index) => {
+                state.files.splice(index, 1);
+                renderFileList();
+            },
+
+            // Chat
+            startNewConversation: () => {
+                state.activeConversationId = Date.now().toString();
+                state.messages = [];
+                state.files = []; // Reset files for new chat? Or keep? Let's clear for new context.
+                renderFileList();
+                ui.showScreen('chat-screen');
+            },
+
+            sendMessage: async () => {
+                const input = el('chat-input');
+                const text = input.value.trim();
+                if (!text || !genAI) {
+                    if(!genAI) alert("Configure a API Key do Google em Desenvolvedor primeiro.");
+                    return;
                 }
 
-                state.knowledgeBase[file.name] = fullText;
-                await saveSystemToCloud();
+                // 1. UI Update (User)
+                state.messages.push({ role: 'user', text: text });
+                input.value = '';
+                renderChat();
                 
-                alert("Livro adicionado com sucesso!");
-                renderDocsList();
+                // 2. Loading State
+                state.messages.push({ role: 'model', text: 'Pensando...', loading: true });
+                renderChat();
 
-            } catch (e) {
-                console.error(e);
-                alert("Erro ao ler PDF.");
-                renderDocsList();
+                try {
+                    // 3. Call Gemini
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Use 1.5-flash which is stable
+                    
+                    const promptConfig = `
+                        Você é um professor particular.
+                        Matéria: ${state.config.subject}.
+                        Estilo: ${state.config.giveFinal ? "Dê a resposta completa e direta." : "Dê dicas, guie o aluno, não dê a resposta final de cara."}
+                        Responda em Markdown.
+                    `;
+
+                    // Prepare history + files
+                    // Nota: Gemini API stateless via REST usually expects full context in each turn or using chatSession.
+                    // Para simplificar no browser, vamos usar chatSession mas injetando os arquivos na mensagem atual.
+                    
+                    const chat = model.startChat({
+                        history: state.messages
+                            .filter(m => !m.loading && m.role !== 'system') // Filter out UI logic
+                            .map(m => ({ role: m.role, parts: [{ text: m.text }] }))
+                    });
+
+                    // Montar payload da mensagem atual (Texto + Arquivos carregados)
+                    const parts = [{ text: promptConfig + "\n\nPergunta do aluno: " + text }];
+                    state.files.forEach(f => parts.push(f.part.inlineData ? f.part : f.part));
+
+                    const result = await chat.sendMessage(parts);
+                    const responseText = result.response.text();
+
+                    // 4. UI Update (AI)
+                    state.messages.pop(); // Remove loading
+                    state.messages.push({ role: 'model', text: responseText });
+                    renderChat();
+                    saveHistory();
+
+                } catch (error) {
+                    state.messages.pop();
+                    state.messages.push({ role: 'model', text: `Erro: ${error.message}` });
+                    renderChat();
+                }
+            },
+
+            setAnswerStyle: (isDirect) => {
+                state.config.giveFinal = isDirect;
+                ui.hideModals();
+            },
+            
+            selectSubject: (subj) => {
+                state.config.subject = subj;
+                el('chat-subject-text').textContent = subj;
+                ui.hideModals();
             }
         };
 
-        function renderDocsList(isLoading = false) {
-            const list = document.getElementById('documents-list');
+        // --- Render Functions ---
+        function renderFileList() {
+            const list = el('file-list');
             list.innerHTML = '';
-            if(isLoading) {
-                list.innerHTML = '<p class="text-gray-400 italic">Sincronizando...</p>';
-                return;
-            }
-            const docs = Object.keys(state.knowledgeBase);
-            if(docs.length === 0) {
-                list.innerHTML = '<p class="text-gray-400">Nenhum livro carregado.</p>';
-                return;
-            }
-            docs.forEach(name => {
+            state.files.forEach((f, i) => {
                 const div = document.createElement('div');
-                div.className = "flex justify-between p-2 border rounded bg-gray-50 items-center";
-                div.innerHTML = `<span class="text-sm font-medium truncate w-48">${name}</span><i class="fas fa-check-circle text-green-500"></i>`;
+                div.className = 'flex justify-between items-center bg-gray-100 p-2 rounded text-sm';
+                div.innerHTML = `<span><i class="fas fa-file-pdf text-red-500 mr-2"></i>${f.name}</span> <button onclick="window.app.removeFile(${i})" class="text-red-500"><i class="fas fa-times"></i></button>`;
                 list.appendChild(div);
             });
         }
 
-        // ========================================================
-        // 5. LÓGICA DE CHAT (GEMINI)
-        // ========================================================
-        window.startNewConversation = () => {
-            state.activeConversationId = null;
-            showScreen('chat-initial-screen');
-        };
-
-        window.startNewChat = async () => {
-            const input = document.getElementById('initial-chat-input');
-            const q = input.value.trim();
-            if(!q) return;
-            if(!state.apiKey) return alert("Configure a API Key primeiro!");
-
-            const id = Date.now().toString();
-            state.activeConversationId = id;
-            state.chatHistory[id] = []; // Inicia array
-
-            showScreen('chat-conversa-screen');
-            document.getElementById('chat-body').innerHTML = ''; // Limpa visual
-            
-            await processMessage(q);
-            input.value = '';
-            renderHistoryList();
-        };
-
-        window.sendMessage = async () => {
-            const input = document.getElementById('chat-conversa-input');
-            const q = input.value.trim();
-            if(!q) return;
-            await processMessage(q);
-            input.value = '';
-        };
-
-        async function processMessage(question) {
-            // 1. UI do Usuário
-            appendMessage(question, 'user');
-            
-            // 2. Cria contexto com TODOS os livros
-            const allBooks = Object.values(state.knowledgeBase).join("\n\n=== OUTRO LIVRO ===\n\n");
-            const context = allBooks.slice(0, 800000); // Limite seguro de caracteres
-
-            // 3. Loading
-            appendMessage("Consultando livros...", 'ai', true);
-
-            try {
-                // 4. Chama Gemini
-                const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash"});
-                const prompt = `Você é um tutor chamado Teach AI.
-                Matéria: ${state.selectedSubject}.
+        function renderChat() {
+            const body = el('chat-body');
+            body.innerHTML = '';
+            state.messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`;
                 
-                CONTEXTO DOS LIVROS (Use isso para responder):
-                ${context}
+                const bubble = document.createElement('div');
+                bubble.className = `max-w-[85%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800'}`;
                 
-                PERGUNTA DO ALUNO: ${question}
+                if (msg.loading) {
+                    bubble.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando arquivos e pensando...';
+                } else {
+                    // Simple markdown parse
+                    let html = msg.text
+                        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                        .replace(/\n/g, '<br>');
+                    bubble.innerHTML = html;
+                }
                 
-                Responda de forma didática.`;
-
-                const result = await model.generateContent(prompt);
-                const text = result.response.text();
-
-                // 5. UI da IA e Salvar
-                removeLoading();
-                appendMessage(text, 'ai');
-
-                // Salva no histórico local e nuvem
-                state.chatHistory[state.activeConversationId].push(
-                    { role: 'user', text: question },
-                    { role: 'ai', text: text, subject: state.selectedSubject }
-                );
-                await saveSystemToCloud();
-                renderHistoryList();
-
-            } catch (e) {
-                removeLoading();
-                appendMessage("Erro na IA. Verifique sua chave API.", 'ai');
-                console.error(e);
-            }
-        }
-
-        // ========================================================
-        // 6. UI HELPERS (VISUAL ORIGINAL)
-        // ========================================================
-        function appendMessage(text, sender, isLoading=false) {
-            const body = document.getElementById('chat-body');
-            const div = document.createElement('div');
-            div.className = `flex items-start gap-2.5 ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
-            
-            let content = '';
-            if(isLoading) {
-                div.id = 'loading-bubble';
-                content = `<div class="bg-gray-200 p-3 rounded-xl text-gray-600 flex items-center gap-2"><i class="fas fa-spinner fa-spin"></i> ${text}</div>`;
-            } else {
-                const color = sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800';
-                // Markdown simples
-                const fmt = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-                content = `
-                    <div class="${sender === 'user' ? '' : 'order-first'} text-2xl ${sender === 'user' ? 'text-gray-400' : 'text-indigo-500'}">
-                        <i class="fas ${sender === 'user' ? 'fa-user-circle' : 'fa-robot'}"></i>
-                    </div>
-                    <div class="p-3 rounded-xl max-w-xl ${color}">${fmt}</div>
-                `;
-            }
-            div.innerHTML = content;
-            body.appendChild(div);
+                div.appendChild(bubble);
+                body.appendChild(div);
+            });
             body.scrollTop = body.scrollHeight;
         }
 
-        function removeLoading() {
-            document.getElementById('loading-bubble')?.remove();
+        async function saveHistory() {
+            if (!supabase || !state.activeConversationId) return;
+            // Salva conversa no Supabase (tabela: history, coluna: jsonb)
+            // Em app real: Criar tabela 'conversations'
+            try {
+                // Upsert logic simplificada para arquivo JSON no Storage para manter compatibilidade com sua lógica anterior
+                const fileName = `history/${state.activeConversationId}.json`;
+                const content = JSON.stringify(state.messages);
+                const blob = new Blob([content], {type : 'application/json'});
+                await supabase.storage.from('teach-ai').upload(fileName, blob, { upsert: true });
+                loadHistory(); // Reload sidebar
+            } catch (e) { console.log("Save history error", e); }
         }
 
-        function renderHistoryList() {
-            const list = document.getElementById('history-list');
+        async function loadHistory() {
+            const list = el('history-list');
             list.innerHTML = '';
-            const ids = Object.keys(state.chatHistory).reverse(); // Mais recente primeiro
+            if(!supabase) { list.innerHTML = "Supabase desconectado."; return; }
             
-            if(ids.length === 0) {
-                list.innerHTML = '<p class="text-gray-500 text-sm p-2">Sem histórico.</p>';
-                return;
-            }
-
-            ids.forEach(id => {
-                const turns = state.chatHistory[id];
-                if(turns.length > 0) {
-                    const firstQ = turns[0].text;
-                    const sub = turns[1]?.subject || 'Geral';
-                    const item = document.createElement('div');
-                    item.className = 'p-2 rounded-lg hover:bg-gray-700 cursor-pointer mb-1';
-                    item.innerHTML = `
-                        <p class="font-semibold text-white truncate text-sm">${firstQ}</p>
-                        <p class="text-xs text-gray-400">${sub}</p>
-                    `;
-                    item.onclick = () => loadChat(id);
-                    list.appendChild(item);
+            try {
+                const { data, error } = await supabase.storage.from('teach-ai').list('history', { sortBy: { column: 'created_at', order: 'desc' } });
+                if(data) {
+                    data.forEach(file => {
+                        const btn = document.createElement('button');
+                        btn.className = "block w-full text-left p-2 hover:bg-gray-700 rounded truncate";
+                        btn.textContent = `Conversa ${new Date(file.created_at).toLocaleDateString()}`;
+                        // Load logic... (simplificado para UI apenas aqui)
+                        list.appendChild(btn);
+                    });
                 }
-            });
+            } catch(e) { list.innerHTML = "Erro ao carregar."; }
         }
 
-        window.loadChat = (id) => {
-            state.activeConversationId = id;
-            showScreen('chat-conversa-screen');
-            const body = document.getElementById('chat-body');
-            body.innerHTML = '';
-            const turns = state.chatHistory[id];
-            turns.forEach(t => appendMessage(t.text, t.role));
-            // Update Headers
-            const sub = turns[1]?.subject || 'Geral';
-            state.selectedSubject = sub;
-            updateSubjectHeaders(sub);
-        };
-
-        // --- Navegação e Menus ---
-        window.showScreen = (id) => {
-            ['start-screen', 'chat-initial-screen', 'chat-conversa-screen', 'dev-screen', 'config-screen'].forEach(s => {
-                document.getElementById(s).classList.add('hidden');
-                document.getElementById(s).classList.remove('flex');
-            });
-            const el = document.getElementById(id);
-            el.classList.remove('hidden');
-            el.classList.add('flex');
+        function updateConfigUI() {
+            el('api-key-input').value = state.geminiKey;
+            el('supabase-url').value = state.supabaseUrl;
+            el('supabase-key').value = state.supabaseKey;
             
-            // Mobile sidebar logic
-            if(window.innerWidth < 768) toggleSidebar(false);
-        };
-
-        window.toggleSidebar = (force) => {
-            const sb = document.getElementById('sidebar');
-            const ov = document.getElementById('sidebar-overlay');
-            const isOpen = !sb.classList.contains('-translate-x-full');
-            const shouldOpen = force !== undefined ? force : !isOpen;
-            
-            sb.classList.toggle('-translate-x-full', !shouldOpen);
-            ov.classList.toggle('hidden', !shouldOpen);
-        };
-
-        window.goBack = () => showScreen('start-screen');
-
-        window.saveApiKey = () => {
-            const k = document.getElementById('api-key-input').value;
-            if(k) {
-                state.apiKey = k;
-                localStorage.setItem('geminiApiKey', k);
-                initGemini(k);
-                alert("Salvo!");
-                showScreen('start-screen');
-            }
-        };
-
-        window.showModal = (id) => {
-            document.getElementById('modal-overlay').classList.remove('hidden');
-            const m = document.getElementById(id);
-            m.classList.remove('hidden');
-            m.classList.add('flex');
-            setTimeout(() => m.querySelector('.modal-container').classList.add('active'), 10);
-        };
-
-        window.hideAllModals = () => {
-            document.getElementById('modal-overlay').classList.add('hidden');
-            ['subject-modal'].forEach(id => {
-                 const m = document.getElementById(id);
-                 m.classList.add('hidden');
-                 m.classList.remove('flex');
-                 m.querySelector('.modal-container').classList.remove('active');
-            });
-        };
-
-        function setupUI() {
-            // Setup Subjects
-            const subs = ['Matemática', 'Física', 'Química', 'História', 'Geral'];
-            const container = document.getElementById('subject-options');
-            subs.forEach(s => {
+            // Popula matérias
+            const subList = el('subject-list');
+            subList.innerHTML = '';
+            state.subjects.forEach(s => {
                 const btn = document.createElement('button');
-                btn.className = "w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors";
+                btn.className = "w-full text-left p-2 hover:bg-gray-100 rounded";
                 btn.textContent = s;
-                btn.onclick = () => {
-                    state.selectedSubject = s;
-                    updateSubjectHeaders(s);
-                    hideAllModals();
-                };
-                container.appendChild(btn);
-            });
-            
-            // Enter keys
-            document.getElementById('initial-chat-input').addEventListener('keypress', (e) => {
-                if(e.key==='Enter') startNewChat();
-            });
-            document.getElementById('chat-conversa-input').addEventListener('keypress', (e) => {
-                if(e.key==='Enter') sendMessage();
+                btn.onclick = () => window.app.selectSubject(s);
+                subList.appendChild(btn);
             });
         }
 
-        function updateSubjectHeaders(s) {
-            document.getElementById('subject-header-text').textContent = s;
-            document.getElementById('subject-header-text-chat').textContent = s;
-            document.getElementById('subject-btn-text').textContent = s;
-            document.getElementById('subject-btn-text-convo').textContent = s;
-        }
+        // Boot
+        document.addEventListener('DOMContentLoaded', () => {
+            initClients();
+            // Enter key handler
+            el('chat-input').addEventListener('keypress', (e) => {
+                if(e.key === 'Enter') window.app.sendMessage();
+            });
+        });
 
-        function initGemini(k) {
-            genAI = new GoogleGenerativeAI(k);
-        }
     </script>
 </body>
 </html>
