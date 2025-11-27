@@ -142,8 +142,8 @@
         import { GoogleGenerativeAI } from "@google/generative-ai";
 
         // ================= CONFIGURAÇÃO (PREENCHA AQUI) =================
-        const SUPABASE_URL = 'SUA_URL_SUPABASE_AQUI'; 
-        const SUPABASE_KEY = 'SUA_KEY_ANON_PUBLIC_AQUI';
+        const SUPABASE_URL = 'https://kjzoepvglthrhmwmpqay.supabase.co'; 
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtqem9lcHZnbHRocmhtd21wcWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyMTEwOTksImV4cCI6MjA3OTc4NzA5OX0.9laD9f5PAhXND0E8JuhqmElS-RqEMb-_83CqP5VIXtI';
         const BUCKET_NAME = 'arquivos-teach-ai';
         const DB_FILE_NAME = 'system/knowledge_base.json'; // O arquivo "cérebro"
 
@@ -358,7 +358,7 @@
 
         function initGemini(apiKey) {
             genAI = new GoogleGenerativeAI(apiKey);
-            model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
+            model = genAI.getGenerativeModel({ model: "gemini-2.5-flash"});
         }
 
         function updateStatus(type, msg) {
@@ -414,3 +414,4 @@
     </script>
 </body>
 </html>
+
