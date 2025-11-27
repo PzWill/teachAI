@@ -5,32 +5,35 @@ import json
 import uuid
 import faiss
 import numpy as np
-import pickle
 from collections import deque
 from PyPDF2 import PdfReader
-from sentence_transformers import SentenceTransformer
+# REMOVEMOS O SENTENCE_TRANSFORMERS AQUI
 import google.generativeai as genai
 from flask import Flask, request, jsonify, render_template_string
 from supabase import create_client, Client
 
 # ====================================================================
-# CONFIGURAÇÃO E INICIALIZAÇÃO
+# CONFIGURAÇÃO
 # ====================================================================
 
 app = Flask(__name__)
 
 # Configurações Globais
-EMBED_MODEL = "all-MiniLM-L6-v2"
-EMBED_DIM = 384
+# Gemini Text-Embedding-004 usa 768 dimensões (o anterior usava 384)
+EMBED_DIM = 768 
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 200
 DEFAULT_TOP_K = 5
-BUCKET_NAME = "teach-ai-files" # Nome do bucket criado no Supabase
+BUCKET_NAME = "teach-ai-files" 
 
-# Configuração de Ambiente (Render ou Local)
+# Configuração de Ambiente
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY") # Use a chave 'service_role'
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Configurar Gemini
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # Inicialização do Cliente Supabase
 supabase: Client = None
@@ -40,13 +43,8 @@ if SUPABASE_URL and SUPABASE_KEY:
         print("Conectado ao Supabase.")
     except Exception as e:
         print(f"Erro ao conectar Supabase: {e}")
-else:
-    print("AVISO: Variáveis SUPABASE_URL e SUPABASE_KEY não encontradas.")
 
-# Inicialização da IA
-embedder = SentenceTransformer(EMBED_MODEL)
-
-# Estado em Memória (Cache)
+# Estado em Memória
 state = {
     'index': faiss.IndexFlatL2(EMBED_DIM),
     'id_to_text': {}, 
@@ -57,82 +55,122 @@ state = {
 }
 
 # ====================================================================
-# FUNÇÕES DE PERSISTÊNCIA (SUPABASE)
+# NOVA FUNÇÃO DE EMBEDDING (USA O GOOGLE, NÃO A RAM)
+# ====================================================================
+def get_embedding(text):
+    """Gera vetor usando a API do Gemini (super leve para o servidor)"""
+    try:
+        # Rate limit manual simples
+        time.sleep(0.5) 
+        result = genai.embed_content(
+            model="models/text-embedding-004",
+            content=text,
+            task_type="retrieval_document",
+            title="Educational Content"
+        )
+        return result['embedding']
+    except Exception as e:
+        print(f"Erro no embedding API: {e}")
+        return [0.0] * EMBED_DIM
+
+def get_query_embedding(text):
+    """Gera vetor para a pergunta"""
+    try:
+        result = genai.embed_content(
+            model="models/text-embedding-004",
+            content=text,
+            task_type="retrieval_query"
+        )
+        return result['embedding']
+    except Exception as e:
+        print(f"Erro no embedding Query: {e}")
+        return [0.0] * EMBED_DIM
+
+# ====================================================================
+# FUNÇÕES DE SUPABASE E AUXILIARES
 # ====================================================================
 
 def download_file_from_supabase(filename):
-    """Baixa um arquivo do Storage para a memória."""
     if not supabase: return None
     try:
         response = supabase.storage.from_(BUCKET_NAME).download(filename)
-        return response # Retorna bytes
-    except Exception as e:
-        print(f"Arquivo {filename} não encontrado ou erro ao baixar: {e}")
+        return response
+    except:
         return None
 
 def upload_file_to_supabase(filename, data_bytes, content_type='application/octet-stream'):
-    """Sobe um arquivo para o Storage (sobrescreve se existir)."""
     if not supabase: return
     try:
-        # Opção upsert=True força a sobrescrever
         supabase.storage.from_(BUCKET_NAME).upload(
             path=filename,
             file=data_bytes,
             file_options={"content-type": content_type, "upsert": "true"}
         )
-        print(f"Salvo no Supabase: {filename}")
     except Exception as e:
-        print(f"Erro ao salvar {filename}: {e}")
+        print(f"Erro upload: {e}")
 
 def load_state():
-    """Restaura o estado do aplicativo do Supabase."""
-    print("Carregando estado do Supabase...")
+    print("Carregando estado...")
     
-    # 1. Carregar Índice FAISS
-    index_bytes = download_file_from_supabase('vector_store.index')
-    if index_bytes:
-        with open('/tmp/temp_index.faiss', 'wb') as f:
-            f.write(index_bytes)
-        state['index'] = faiss.read_index('/tmp/temp_index.faiss')
+    # Reset preventivo: Se mudarmos a dimensão, o FAISS antigo quebra
+    # Vamos tentar carregar, se der erro de dimensão, cria novo.
+    try:
+        index_bytes = download_file_from_supabase('vector_store.index')
+        if index_bytes:
+            with open('/tmp/temp_index.faiss', 'wb') as f:
+                f.write(index_bytes)
+            loaded_index = faiss.read_index('/tmp/temp_index.faiss')
+            
+            # Verifica se a dimensão bate
+            if loaded_index.d == EMBED_DIM:
+                state['index'] = loaded_index
+                print("Índice FAISS carregado com sucesso.")
+            else:
+                print(f"Dimensão incompatível ({loaded_index.d} vs {EMBED_DIM}). Criando novo índice.")
+                state['index'] = faiss.IndexFlatL2(EMBED_DIM)
+    except Exception as e:
+        print(f"Erro ao carregar índice (criando novo): {e}")
+        state['index'] = faiss.IndexFlatL2(EMBED_DIM)
     
-    # 2. Carregar Textos (JSON)
+    # Carregar Textos
     text_bytes = download_file_from_supabase('id_to_text.json')
     if text_bytes:
-        data = json.loads(text_bytes.decode('utf-8'))
-        state['id_to_text'] = {int(k): v for k, v in data.items()}
+        try:
+            data = json.loads(text_bytes.decode('utf-8'))
+            state['id_to_text'] = {int(k): v for k, v in data.items()}
+        except: pass
 
-    # 3. Carregar Metadados (JSON)
+    # Carregar Metadados
     meta_bytes = download_file_from_supabase('docs_meta.json')
     if meta_bytes:
-        state['docs_meta'] = json.loads(meta_bytes.decode('utf-8'))
+        try:
+            state['docs_meta'] = json.loads(meta_bytes.decode('utf-8'))
+        except: pass
 
-    # 4. Carregar Histórico (JSON)
+    # Carregar Histórico
     hist_bytes = download_file_from_supabase('history.json')
     if hist_bytes:
-        state['history'] = json.loads(hist_bytes.decode('utf-8'))
-        
-    print("Estado carregado.")
+        try:
+            state['history'] = json.loads(hist_bytes.decode('utf-8'))
+        except: pass
 
 def save_state_bg():
-    """Salva tudo no Supabase."""
     if not supabase: return
+    try:
+        faiss.write_index(state['index'], '/tmp/temp_index.faiss')
+        with open('/tmp/temp_index.faiss', 'rb') as f:
+            upload_file_to_supabase('vector_store.index', f.read())
 
-    # 1. Salvar FAISS
-    faiss.write_index(state['index'], '/tmp/temp_index.faiss')
-    with open('/tmp/temp_index.faiss', 'rb') as f:
-        upload_file_to_supabase('vector_store.index', f.read())
+        json_texts = json.dumps(state['id_to_text'])
+        upload_file_to_supabase('id_to_text.json', json_texts.encode('utf-8'), 'application/json')
 
-    # 2. Salvar Textos
-    json_texts = json.dumps(state['id_to_text'])
-    upload_file_to_supabase('id_to_text.json', json_texts.encode('utf-8'), 'application/json')
+        json_meta = json.dumps(state['docs_meta'])
+        upload_file_to_supabase('docs_meta.json', json_meta.encode('utf-8'), 'application/json')
 
-    # 3. Salvar Metadados
-    json_meta = json.dumps(state['docs_meta'])
-    upload_file_to_supabase('docs_meta.json', json_meta.encode('utf-8'), 'application/json')
-
-    # 4. Salvar Histórico
-    json_hist = json.dumps(state['history'])
-    upload_file_to_supabase('history.json', json_hist.encode('utf-8'), 'application/json')
+        json_hist = json.dumps(state['history'])
+        upload_file_to_supabase('history.json', json_hist.encode('utf-8'), 'application/json')
+    except Exception as e:
+        print(f"Erro ao salvar estado: {e}")
 
 def process_pdf_bytes(pdf_bytes):
     try:
@@ -140,29 +178,17 @@ def process_pdf_bytes(pdf_bytes):
         full_text = "\n\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
         chunks = [full_text[i:i + CHUNK_SIZE] for i in range(0, len(full_text), CHUNK_SIZE - CHUNK_OVERLAP)]
         return chunks, len(reader.pages)
-    except Exception as e:
-        print(f"Erro PDF: {e}")
+    except:
         return [], 0
 
-def call_gemini_api(prompt):
-    if not state['api_key']: return {'error': 'API Key não configurada.'}
-    
-    now = time.time()
-    while state['req_timestamps'] and (now - state['req_timestamps'][0] > 60):
-        state['req_timestamps'].popleft()
-    if len(state['req_timestamps']) >= 15:
-        return {'error': 'Muitas requisições. Aguarde.'}
-
+def call_gemini_chat(prompt):
     try:
-        genai.configure(api_key=state['api_key'])
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(prompt)
-        state['req_timestamps'].append(time.time())
         return {'text': response.text}
     except Exception as e:
         return {'error': str(e)}
 
-# Carregar ao iniciar
 with app.app_context():
     load_state()
 
@@ -182,18 +208,19 @@ def chat():
     
     results = []
     if state['index'].ntotal > 0:
-        q_vec = embedder.encode([question], convert_to_numpy=True).astype('float32')
+        # Usa a API do Google para criar o vetor da pergunta
+        q_vec = np.array([get_query_embedding(question)], dtype='float32')
         dists, idxs = state['index'].search(q_vec, DEFAULT_TOP_K)
         for i, idx in enumerate(idxs[0]):
             if idx != -1 and int(idx) in state['id_to_text']:
                 results.append({'text': state['id_to_text'][int(idx)], 'score': float(dists[0][i])})
     
     context_str = "\n---\n".join([r['text'] for r in results]) if results else "Sem contexto."
-    style = "Dê a resposta direta." if data.get('give_final') else "Dê apenas uma dica/guia, não a resposta final."
+    style = "Dê a resposta direta." if data.get('give_final') else "Dê apenas uma dica/guia."
     
     prompt = f"Instrutor: {style}\nMatéria: {data.get('subject')}\nContexto:\n{context_str}\n\nAluno: {question}"
     
-    resp = call_gemini_api(prompt)
+    resp = call_gemini_chat(prompt)
     if 'error' in resp: return jsonify(resp), 500
     
     new_turn = {
@@ -221,7 +248,14 @@ def docs_handler():
             content = f.read()
             chunks, pages = process_pdf_bytes(content)
             if chunks:
-                vecs = embedder.encode(chunks, convert_to_numpy=True).astype('float32')
+                # Processa cada chunk na API do Google (pode demorar um pouco)
+                embeddings = []
+                for chunk in chunks:
+                    emb = get_embedding(chunk)
+                    embeddings.append(emb)
+                
+                vecs = np.array(embeddings, dtype='float32')
+                
                 start = state['index'].ntotal
                 state['index'].add(vecs)
                 for i, txt in enumerate(chunks): state['id_to_text'][start+i] = txt
