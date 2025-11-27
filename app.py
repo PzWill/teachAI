@@ -183,7 +183,7 @@ def process_pdf_bytes(pdf_bytes):
 
 def call_gemini_chat(prompt):
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         response = model.generate_content(prompt)
         return {'text': response.text}
     except Exception as e:
@@ -1090,3 +1090,4 @@ HTML_TEMPLATE = """
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
