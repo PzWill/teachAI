@@ -3,9 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teach AI - Assistente Inteligente</title>
+    <title>Teach AI</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- BIBLIOTECAS MÁGICAS (Supabase, PDF.js, Google AI) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -16,402 +25,570 @@
         }
       }
     </script>
+
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .typing-dot { animation: typing 1.4s infinite ease-in-out both; }
-        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        .modal-overlay { transition: opacity 0.3s ease; }
+        .modal-container { transition: transform 0.3s ease, opacity 0.3s ease; transform: scale(0.95); opacity: 0; }
+        .modal-container.active { transform: scale(1); opacity: 1; }
+        #app-wrapper { width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        #app-container { width: 100%; height: 100%; max-height: 100vh; display: flex; flex-direction: column; background-color: #ffffff; }
+        @media (min-width: 768px) {
+            #app-container { max-width: 1100px; height: 90vh; max-height: 850px; border-radius: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); flex-direction: row; }
+            #sidebar { width: 288px; border-radius: 1.5rem 0 0 1.5rem; }
+            #main-content-wrapper { border-radius: 0 1.5rem 1.5rem 0; }
+        }
     </style>
 </head>
-<body class="h-screen overflow-hidden flex justify-center items-center">
+<body class="overflow-hidden">
 
-    <div class="w-full h-full md:max-w-6xl md:h-[90vh] bg-white md:rounded-2xl shadow-2xl flex overflow-hidden relative">
-        
-        <div id="sidebar" class="hidden md:flex flex-col w-72 bg-slate-900 text-white p-6 transition-all duration-300 absolute md:relative z-20 h-full">
-            <div class="flex justify-between items-center mb-8">
-                <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">Teach AI</h1>
-                <button onclick="resetChat()" class="p-2 hover:bg-slate-800 rounded-full transition"><i class="fas fa-plus"></i></button>
-            </div>
-            
-            <div class="flex-grow overflow-y-auto no-scrollbar space-y-2" id="history-container">
-                 <div class="p-3 rounded-lg bg-slate-800/50 cursor-pointer hover:bg-slate-800 transition">
-                    <p class="text-sm font-medium text-slate-300">Nova conversa...</p>
-                </div>
-            </div>
+    <div id="app-wrapper">
+        <div id="app-container" class="overflow-hidden relative">
 
-            <div class="mt-4 pt-4 border-t border-slate-700 space-y-2">
-                <button onclick="toggleScreen('dev-screen')" class="w-full text-left p-2 hover:bg-slate-800 rounded flex items-center gap-3 text-sm text-slate-300">
-                    <i class="fas fa-database"></i> Base de Conhecimento
-                </button>
-                <button onclick="toggleScreen('api-screen')" class="w-full text-left p-2 hover:bg-slate-800 rounded flex items-center gap-3 text-sm text-slate-300">
-                    <i class="fas fa-key"></i> Configurar API Key
-                </button>
-            </div>
-        </div>
-
-        <div class="flex-grow flex flex-col relative w-full">
-            <div class="md:hidden flex items-center justify-between p-4 border-b bg-white z-10">
-                <button onclick="document.getElementById('sidebar').classList.toggle('hidden')" class="text-slate-600"><i class="fas fa-bars text-xl"></i></button>
-                <span class="font-bold text-slate-800">Teach AI</span>
-                <div class="w-6"></div>
-            </div>
-
-            <div id="api-screen" class="hidden absolute inset-0 bg-white z-30 flex-col p-8 justify-center items-center">
-                <div class="max-w-md w-full">
-                    <h2 class="text-2xl font-bold mb-4 text-center">Configuração Inicial</h2>
-                    <p class="text-gray-600 mb-4 text-center">Insira sua chave do Google Gemini para começar.</p>
-                    <input type="password" id="api-key-input" placeholder="Cole sua chave AIza..." class="w-full p-3 border rounded mb-4">
-                    <button onclick="saveApiKey()" class="bg-indigo-600 text-white px-6 py-3 rounded hover:bg-indigo-700 w-full">Salvar e Entrar</button>
-                </div>
-            </div>
-
-            <div id="dev-screen" class="hidden absolute inset-0 bg-white z-30 flex-col p-8 overflow-y-auto">
+            <!-- SIDEBAR -->
+            <div id="sidebar" class="absolute md:relative top-0 left-0 h-full w-72 bg-gray-800 text-white transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-30 p-6 flex flex-col">
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold">Gestão de Documentos (Supabase)</h2>
-                    <button onclick="toggleScreen('chat-screen')" class="text-gray-500 hover:text-gray-800"><i class="fas fa-times text-xl"></i></button>
+                    <h2 class="text-2xl font-bold text-white">Teach AI</h2>
+                    <button onclick="startNewConversation()" title="Nova Conversa" class="p-2 rounded-full hover:bg-gray-700"><i class="fas fa-plus"></i></button>
                 </div>
                 
-                <div class="border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center bg-indigo-50 hover:bg-indigo-100 transition cursor-pointer relative">
-                    <input type="file" id="file-upload" accept=".pdf" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleFileUpload(this)">
-                    <i class="fas fa-cloud-upload-alt text-4xl text-indigo-400 mb-2"></i>
-                    <p class="text-indigo-800 font-medium">Clique para adicionar PDF</p>
-                    <p class="text-xs text-indigo-500">O arquivo será sincronizado com a nuvem.</p>
+                <h3 class="text-sm font-semibold text-gray-400 uppercase mb-2">Histórico</h3>
+                <div id="history-list" class="flex-grow overflow-y-auto space-y-2 pr-2">
+                    <p class="text-gray-500 text-sm italic p-2">Carregando...</p>
                 </div>
-
-                <div class="mt-8">
-                    <div class="flex justify-between items-center mb-2">
-                         <h3 class="font-bold text-gray-700">Documentos na Nuvem</h3>
-                         <button onclick="clearKnowledgeBase()" class="text-xs text-red-500 hover:underline">Limpar Tudo</button>
-                    </div>
-                   
-                    <div id="docs-list" class="space-y-2">
-                        <p class="text-sm text-gray-400 italic" id="loading-docs-msg">Verificando Supabase...</p>
-                    </div>
+                
+                <div class="border-t border-gray-600 pt-4 mt-4 space-y-2">
+                     <button onclick="showScreen('dev-screen')" class="w-full text-left flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-tools w-5 text-center"></i><span>Base de Conhecimento</span>
+                    </button>
+                    <button onclick="showScreen('config-screen')" class="w-full text-left flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700 transition-colors">
+                       <i class="fas fa-key w-5 text-center"></i><span>Configurar API</span>
+                    </button>
                 </div>
             </div>
 
-            <div id="chat-screen" class="flex flex-col h-full">
-                <div class="p-4 border-b flex justify-between items-center bg-white shadow-sm">
-                    <div>
-                        <h2 class="font-semibold text-slate-800">Assistente de Estudos</h2>
-                        <div class="flex items-center gap-1">
-                            <span id="status-dot" class="w-2 h-2 rounded-full bg-yellow-500"></span>
-                            <span id="status-text" class="text-xs text-slate-500">Conectando...</span>
+            <div id="main-content-wrapper" class="relative flex flex-col w-full h-full bg-gray-50">
+                <div id="sidebar-overlay" class="hidden md:hidden absolute inset-0 bg-black bg-opacity-50 z-20" onclick="toggleSidebar()"></div>
+                
+                <div id="main-content" class="flex-grow">
+                    <!-- SCREEN 1: START -->
+                    <div id="start-screen" class="flex flex-col h-full p-8 text-center bg-white">
+                        <div class="flex-grow flex flex-col items-center justify-center">
+                            <div class="w-48 h-48 bg-indigo-100 rounded-full flex items-center justify-center mb-8">
+                                <i class="fas fa-robot text-7xl text-indigo-500"></i>
+                            </div>
+                            <h1 class="text-4xl font-bold text-gray-800">Bem-vindo ao Teach AI</h1>
+                            <p class="text-gray-500 mt-2 text-lg">Seu assistente de estudos pessoal.</p>
                         </div>
+                        <button onclick="startNewConversation()" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
+                            Começar <i class="fas fa-arrow-right"></i>
+                        </button>
                     </div>
-                    <div class="flex gap-2">
-                        <select id="subject-select" class="text-sm border rounded p-1 text-slate-600 bg-slate-50">
-                            <option>Geral</option>
-                            <option>Matemática</option>
-                            <option>História</option>
-                            <option>Física</option>
-                        </select>
+
+                    <!-- SCREEN 2: INITIAL CHAT -->
+                    <div id="chat-initial-screen" class="hidden flex-col h-full">
+                        <header class="flex items-center p-4 border-b border-gray-200 flex-shrink-0">
+                            <button onclick="toggleSidebar()" class="p-2 rounded-full hover:bg-gray-100 md:hidden"><i class="fas fa-bars text-gray-700"></i></button>
+                            <div class="text-center flex-grow">
+                                <h2 class="font-semibold text-gray-800">Nova Conversa</h2>
+                                <p id="subject-header-text" class="text-xs text-green-600 font-semibold">Geral</p>
+                            </div>
+                            <div class="w-8"></div>
+                        </header>
+                        <main class="flex-grow flex flex-col items-center justify-center p-4 text-center">
+                            <i class="fas fa-comments text-5xl text-gray-300 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-gray-700">Como posso ajudar?</h3>
+                            <p class="text-gray-400">Selecione uma matéria e faça sua pergunta.</p>
+                        </main>
+                        <footer class="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
+                            <div class="flex justify-center gap-4 mb-3">
+                                <button onclick="showModal('subject-modal')" class="text-sm text-indigo-600 hover:underline font-medium"><i class="fas fa-book mr-1"></i><span id="subject-btn-text">Matéria</span></button>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <textarea id="initial-chat-input" placeholder="Digite sua dúvida aqui..." class="w-full p-3 bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" rows="1"></textarea>
+                                <button onclick="startNewChat()" class="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 transition-colors"><i class="fas fa-paper-plane"></i></button>
+                            </div>
+                        </footer>
+                    </div>
+
+                    <!-- SCREEN 3: ACTIVE CHAT -->
+                    <div id="chat-conversa-screen" class="hidden flex-col h-full">
+                        <header class="flex items-center p-4 border-b border-gray-200 flex-shrink-0">
+                             <button onclick="toggleSidebar()" class="p-2 rounded-full hover:bg-gray-100 md:hidden"><i class="fas fa-bars text-gray-700"></i></button>
+                            <div class="text-center flex-grow">
+                                <h2 class="font-semibold text-gray-800">Conversa Ativa</h2>
+                                <p id="subject-header-text-chat" class="text-xs text-green-600 font-semibold">Geral</p>
+                            </div>
+                            <div class="w-8"></div>
+                        </header>
+                        <main id="chat-body" class="flex-grow p-4 overflow-y-auto no-scrollbar space-y-4">
+                            <!-- Messages go here -->
+                        </main>
+                        <footer class="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
+                             <div class="flex justify-center gap-4 mb-3">
+                                <button onclick="showModal('subject-modal')" class="text-sm text-indigo-600 hover:underline font-medium"><i class="fas fa-book mr-1"></i><span id="subject-btn-text-convo">Matéria</span></button>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <textarea id="chat-conversa-input" placeholder="Faça outra pergunta..." class="w-full p-3 bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" rows="1"></textarea>
+                                <button onclick="sendMessage()" class="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 transition-colors"><i class="fas fa-paper-plane"></i></button>
+                            </div>
+                        </footer>
+                    </div>
+
+                    <!-- SCREEN 4: DEVELOPER (DOCS) -->
+                    <div id="dev-screen" class="hidden flex-col h-full">
+                        <header class="flex items-center p-4 border-b border-gray-200 flex-shrink-0">
+                            <button onclick="goBack()" class="p-2 rounded-full hover:bg-gray-100"><i class="fas fa-arrow-left text-gray-700"></i></button>
+                            <h2 class="font-semibold text-gray-800 flex-grow text-center">Gestão de Documentos</h2>
+                            <div class="w-8"></div>
+                        </header>
+                        <main class="flex-grow p-6 space-y-6 overflow-y-auto">
+                            <div class="bg-white p-4 rounded-lg shadow-sm border">
+                                <h3 class="font-semibold text-lg mb-2">📚 Upload de Livros (PDF)</h3>
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center relative">
+                                    <input type="file" id="pdf-upload" accept=".pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFileUpload(this)">
+                                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-2"></i>
+                                    <p class="text-gray-600">Clique ou arraste um PDF aqui.</p>
+                                    <p class="text-xs text-gray-400 mt-1">Salvo automaticamente na nuvem.</p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow-sm border">
+                                <div class="flex justify-between items-center mb-3">
+                                    <h3 class="font-semibold text-lg">📄 Documentos na Nuvem</h3>
+                                    <button onclick="clearSystem()" class="text-xs text-red-500 hover:underline">Resetar Tudo</button>
+                                </div>
+                                <div id="documents-list" class="space-y-2">
+                                    <p class="text-gray-500 italic">Carregando...</p>
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+
+                     <!-- SCREEN 5: CONFIG -->
+                     <div id="config-screen" class="hidden flex-col h-full">
+                        <header class="flex items-center p-4 border-b border-gray-200 flex-shrink-0">
+                            <button onclick="goBack()" class="p-2 rounded-full hover:bg-gray-100"><i class="fas fa-arrow-left text-gray-700"></i></button>
+                            <h2 class="font-semibold text-gray-800 flex-grow text-center">Configurações</h2>
+                            <div class="w-8"></div>
+                        </header>
+                        <main class="flex-grow p-6 flex flex-col items-center justify-center">
+                            <div class="bg-white p-6 rounded-lg shadow-sm border w-full max-w-md">
+                                <h3 class="font-semibold text-lg mb-2">Chave da API (Gemini)</h3>
+                                <p class="text-sm text-gray-600 mb-3">Necessário para o Teach AI funcionar.</p>
+                                <input id="api-key-input" type="password" placeholder="Cole sua chave AIza..." class="w-full p-2 border rounded-md mb-4">
+                                <button onclick="saveApiKey()" class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700">Salvar</button>
+                            </div>
+                        </main>
                     </div>
                 </div>
-
-                <div id="chat-box" class="flex-grow overflow-y-auto p-4 space-y-4 bg-slate-50">
-                    <div class="flex gap-3">
-                        <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                            <i class="fas fa-robot text-white text-xs"></i>
+                
+                <!-- MODALS -->
+                <div id="modal-overlay" class="hidden absolute inset-0 bg-black bg-opacity-50 z-40 modal-overlay" onclick="hideAllModals()"></div>
+                <div id="subject-modal" class="hidden absolute inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-xs modal-container">
+                        <h3 class="text-lg font-semibold text-center mb-4">Escolha a matéria</h3>
+                        <div class="space-y-2" id="subject-options">
+                            <!-- Populated by JS -->
                         </div>
-                        <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] border border-slate-100">
-                            <p class="text-slate-700">Olá! Eu sou o Teach AI. Seus documentos estão salvos na nuvem. Pode perguntar!</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="p-4 bg-white border-t">
-                    <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-xl border border-slate-200 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition">
-                        <button onclick="toggleScreen('dev-screen')" class="p-2 text-slate-400 hover:text-indigo-600 transition" title="Adicionar Documento">
-                            <i class="fas fa-paperclip"></i>
-                        </button>
-                        <input type="text" id="user-input" placeholder="Digite sua dúvida..." class="flex-grow bg-transparent border-none focus:ring-0 text-slate-700 placeholder-slate-400" onkeypress="if(event.key === 'Enter') sendMessage()">
-                        <button onclick="sendMessage()" class="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-md">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- LÓGICA DO SISTEMA -->
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
 
-        // ================= CONFIGURAÇÃO (PREENCHA AQUI) =================
+        // ========================================================
+        // 1. CONSTANTES DO SUPABASE (COLOQUE SEUS DADOS AQUI)
+        // ========================================================
         const SUPABASE_URL = 'https://kjzoepvglthrhmwmpqay.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtqem9lcHZnbHRocmhtd21wcWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyMTEwOTksImV4cCI6MjA3OTc4NzA5OX0.9laD9f5PAhXND0E8JuhqmElS-RqEMb-_83CqP5VIXtI';
+        
         const BUCKET_NAME = 'arquivos-teach-ai';
-        const DB_FILE_NAME = 'system/knowledge_base.json'; // O arquivo "cérebro"
+        const STORAGE_FILE = 'system/teach_ai_data.json'; // Arquivo único que guarda TUDO (Docs + Histórico)
 
+        // Estado Local
+        let state = {
+            chatHistory: {}, // { id: [mensagens] }
+            knowledgeBase: {}, // { "livro.pdf": "texto..." }
+            currentConversationId: null,
+            selectedSubject: 'Geral',
+            apiKey: localStorage.getItem('geminiApiKey') || ''
+        };
+
+        // Inicialização Supabase
         let supabase = null;
-        if(SUPABASE_URL && SUPABASE_KEY && SUPABASE_URL !== 'SUA_URL_SUPABASE_AQUI') {
-             supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        if(SUPABASE_URL && !SUPABASE_URL.includes('SUA_URL')) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         }
 
-        // Estado Global
-        let knowledgeBase = {}; // Objeto { "arquivo.pdf": "texto..." }
         let genAI = null;
-        let model = null;
 
-        // Inicialização
+        // ========================================================
+        // 2. INICIALIZAÇÃO
+        // ========================================================
         window.addEventListener('load', async () => {
-            const savedKey = localStorage.getItem('gemini_key');
-            if (savedKey) {
-                initGemini(savedKey);
-                toggleScreen('chat-screen');
+            if(state.apiKey) initGemini(state.apiKey);
+            
+            // Carregar dados da nuvem
+            if(supabase) {
+                await loadSystemFromCloud();
             } else {
-                toggleScreen('api-screen');
+                console.warn("Supabase não configurado.");
             }
 
-            // Sincronizar com a nuvem ao abrir
-            if(supabase) await loadKnowledgeFromCloud();
+            setupUI();
+            showScreen('start-screen');
         });
 
-        // ================= GESTÃO DE DADOS (PERSISTÊNCIA) =================
-
-        async function loadKnowledgeFromCloud() {
-            updateStatus('loading', 'Baixando documentos...');
-            const listDiv = document.getElementById('docs-list');
-            
+        // ========================================================
+        // 3. PERSISTÊNCIA (SUPABASE)
+        // ========================================================
+        async function loadSystemFromCloud() {
+            renderDocsList(true); // Loading state
             try {
-                const { data, error } = await supabase.storage.from(BUCKET_NAME).download(DB_FILE_NAME);
-                
-                if (error) {
-                    console.log("Nenhum conhecimento prévio encontrado.");
-                    listDiv.innerHTML = '<p class="text-sm text-gray-400 italic">Nenhum documento na nuvem.</p>';
-                    updateStatus('online', 'Online (Vazio)');
-                    return;
+                const { data, error } = await supabase.storage.from(BUCKET_NAME).download(STORAGE_FILE);
+                if (!error) {
+                    const text = await data.text();
+                    const cloudData = JSON.parse(text);
+                    state.knowledgeBase = cloudData.knowledgeBase || {};
+                    state.chatHistory = cloudData.chatHistory || {};
+                    console.log("Dados carregados da nuvem.");
                 }
-
-                const text = await data.text();
-                knowledgeBase = JSON.parse(text);
-                
-                // Renderizar lista
-                renderDocsList();
-                const count = Object.keys(knowledgeBase).length;
-                updateStatus('online', `Online | ${count} docs carregados`);
-
             } catch (e) {
-                console.error("Erro ao carregar:", e);
-                updateStatus('error', 'Erro de conexão');
+                console.log("Nenhum dado prévio ou erro:", e);
             }
+            renderDocsList();
+            renderHistoryList();
         }
 
-        async function saveKnowledgeToCloud() {
-            if (!supabase) return;
-            // Salva o objeto knowledgeBase inteiro como um arquivo JSON no Storage
-            const blob = new Blob([JSON.stringify(knowledgeBase)], {type : 'application/json'});
-            await supabase.storage.from(BUCKET_NAME).upload(DB_FILE_NAME, blob, {
-                contentType: 'application/json',
-                upsert: true
+        async function saveSystemToCloud() {
+            if(!supabase) return;
+            // Salva docs e histórico num único arquivo JSON
+            const payload = {
+                knowledgeBase: state.knowledgeBase,
+                chatHistory: state.chatHistory
+            };
+            const blob = new Blob([JSON.stringify(payload)], {type : 'application/json'});
+            await supabase.storage.from(BUCKET_NAME).upload(STORAGE_FILE, blob, {
+                contentType: 'application/json', upsert: true
             });
-            console.log("Conhecimento salvo na nuvem!");
+            console.log("Sistema salvo na nuvem.");
         }
 
-        function renderDocsList() {
-            const listDiv = document.getElementById('docs-list');
-            listDiv.innerHTML = '';
-            
-            const files = Object.keys(knowledgeBase);
-            if(files.length === 0) {
-                 listDiv.innerHTML = '<p class="text-sm text-gray-400 italic">Nenhum documento carregado.</p>';
-                 return;
-            }
-
-            files.forEach(filename => {
-                const item = document.createElement('div');
-                item.className = "p-3 bg-white border border-slate-200 rounded text-sm flex justify-between items-center";
-                item.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <i class="fas fa-file-pdf text-red-500"></i>
-                        <span class="font-medium text-slate-700 truncate max-w-[150px]">${filename}</span>
-                    </div>
-                    <span class="text-green-500 text-xs"><i class="fas fa-cloud"></i> Salvo</span>
-                `;
-                listDiv.appendChild(item);
-            });
-        }
-
-        window.clearKnowledgeBase = async () => {
-            if(confirm("Tem certeza? Isso apagará todos os documentos da memória do Teach AI para todos os usuários.")) {
-                knowledgeBase = {};
+        window.clearSystem = async () => {
+            if(confirm("Isso apagará todos os livros e conversas para todos os usuários. Confirmar?")) {
+                state.knowledgeBase = {};
+                state.chatHistory = {};
+                await saveSystemToCloud();
                 renderDocsList();
-                await saveKnowledgeToCloud();
-                alert("Memória limpa.");
+                renderHistoryList();
+                alert("Sistema resetado.");
             }
-        }
+        };
 
-        // ================= UPLOAD E EXTRAÇÃO =================
-
+        // ========================================================
+        // 4. LÓGICA DE DOCUMENTOS (PDF)
+        // ========================================================
         window.handleFileUpload = async (input) => {
             const file = input.files[0];
             if (!file) return;
 
-            const listDiv = document.getElementById('docs-list');
-            const loadingItem = document.createElement('div');
-            loadingItem.className = "p-3 bg-indigo-50 text-indigo-700 rounded text-sm flex justify-between animate-pulse";
-            loadingItem.innerHTML = `<span>Lendo ${file.name}...</span><i class="fas fa-spinner fa-spin"></i>`;
-            listDiv.prepend(loadingItem);
+            const listDiv = document.getElementById('documents-list');
+            listDiv.innerHTML = `<div class="p-3 bg-indigo-50 text-indigo-700 rounded animate-pulse">Lendo PDF e salvando...</div>`;
 
             try {
-                // 1. Extrair Texto
                 const arrayBuffer = await file.arrayBuffer();
-                const text = await extractTextFromPDF(arrayBuffer);
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let fullText = "";
                 
-                // 2. Atualizar Memória Local
-                knowledgeBase[file.name] = text;
-                
-                // 3. Salvar na Nuvem (Persistência)
-                loadingItem.innerHTML = `<span>Salvando na nuvem...</span><i class="fas fa-cloud-upload-alt"></i>`;
-                await saveKnowledgeToCloud();
+                // Extrair texto (Limitado a 50 paginas para não travar navegador)
+                const maxPages = Math.min(pdf.numPages, 50); 
+                for (let i = 1; i <= maxPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    fullText += content.items.map(item => item.str).join(" ") + "\n";
+                }
 
-                // 4. Atualizar UI
+                state.knowledgeBase[file.name] = fullText;
+                await saveSystemToCloud();
+                
+                alert("Livro adicionado com sucesso!");
                 renderDocsList();
-                updateStatus('online', `Online | ${Object.keys(knowledgeBase).length} docs`);
 
-            } catch (error) {
-                console.error(error);
-                loadingItem.innerHTML = `<span class="text-red-500">Erro!</span>`;
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao ler PDF.");
+                renderDocsList();
             }
         };
 
-        async function extractTextFromPDF(arrayBuffer) {
-            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-            let text = "";
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                text += content.items.map(item => item.str).join(" ") + "\n";
+        function renderDocsList(isLoading = false) {
+            const list = document.getElementById('documents-list');
+            list.innerHTML = '';
+            if(isLoading) {
+                list.innerHTML = '<p class="text-gray-400 italic">Sincronizando...</p>';
+                return;
             }
-            return text;
+            const docs = Object.keys(state.knowledgeBase);
+            if(docs.length === 0) {
+                list.innerHTML = '<p class="text-gray-400">Nenhum livro carregado.</p>';
+                return;
+            }
+            docs.forEach(name => {
+                const div = document.createElement('div');
+                div.className = "flex justify-between p-2 border rounded bg-gray-50 items-center";
+                div.innerHTML = `<span class="text-sm font-medium truncate w-48">${name}</span><i class="fas fa-check-circle text-green-500"></i>`;
+                list.appendChild(div);
+            });
         }
 
-        // ================= CHAT =================
+        // ========================================================
+        // 5. LÓGICA DE CHAT (GEMINI)
+        // ========================================================
+        window.startNewConversation = () => {
+            state.activeConversationId = null;
+            showScreen('chat-initial-screen');
+        };
+
+        window.startNewChat = async () => {
+            const input = document.getElementById('initial-chat-input');
+            const q = input.value.trim();
+            if(!q) return;
+            if(!state.apiKey) return alert("Configure a API Key primeiro!");
+
+            const id = Date.now().toString();
+            state.activeConversationId = id;
+            state.chatHistory[id] = []; // Inicia array
+
+            showScreen('chat-conversa-screen');
+            document.getElementById('chat-body').innerHTML = ''; // Limpa visual
+            
+            await processMessage(q);
+            input.value = '';
+            renderHistoryList();
+        };
 
         window.sendMessage = async () => {
-            const input = document.getElementById('user-input');
-            const question = input.value.trim();
-            if (!question) return;
-
-            addMessage('user', question);
+            const input = document.getElementById('chat-conversa-input');
+            const q = input.value.trim();
+            if(!q) return;
+            await processMessage(q);
             input.value = '';
-            const loadingId = addLoading();
+        };
+
+        async function processMessage(question) {
+            // 1. UI do Usuário
+            appendMessage(question, 'user');
+            
+            // 2. Cria contexto com TODOS os livros
+            const allBooks = Object.values(state.knowledgeBase).join("\n\n=== OUTRO LIVRO ===\n\n");
+            const context = allBooks.slice(0, 800000); // Limite seguro de caracteres
+
+            // 3. Loading
+            appendMessage("Consultando livros...", 'ai', true);
 
             try {
-                // Junta todo o texto de todos os documentos
-                const allDocsText = Object.values(knowledgeBase).join("\n\n--- NOVO DOCUMENTO ---\n\n");
+                // 4. Chama Gemini
+                const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash"});
+                const prompt = `Você é um tutor chamado Teach AI.
+                Matéria: ${state.selectedSubject}.
                 
-                const subject = document.getElementById('subject-select').value;
-                let prompt = `Você é um tutor educacional chamado Teach AI.
-                Matéria Atual: ${subject}.
+                CONTEXTO DOS LIVROS (Use isso para responder):
+                ${context}
                 
-                INSTRUÇÃO: Use APENAS o contexto abaixo. Se a resposta não estiver lá, diga que não sabe.
+                PERGUNTA DO ALUNO: ${question}
                 
-                CONTEXTO:
-                ${allDocsText.substring(0, 900000)} 
-                
-                DÚVIDA: ${question}`;
+                Responda de forma didática.`;
 
                 const result = await model.generateContent(prompt);
-                const response = result.response;
-                const text = response.text();
+                const text = result.response.text();
 
-                removeLoading(loadingId);
-                addMessage('ai', text);
+                // 5. UI da IA e Salvar
+                removeLoading();
+                appendMessage(text, 'ai');
 
-            } catch (error) {
-                removeLoading(loadingId);
-                addMessage('ai', 'Erro ao conectar com a IA ou contexto muito grande.');
+                // Salva no histórico local e nuvem
+                state.chatHistory[state.activeConversationId].push(
+                    { role: 'user', text: question },
+                    { role: 'ai', text: text, subject: state.selectedSubject }
+                );
+                await saveSystemToCloud();
+                renderHistoryList();
+
+            } catch (e) {
+                removeLoading();
+                appendMessage("Erro na IA. Verifique sua chave API.", 'ai');
+                console.error(e);
             }
-        };
+        }
 
-        // ================= UI HELPERS =================
+        // ========================================================
+        // 6. UI HELPERS (VISUAL ORIGINAL)
+        // ========================================================
+        function appendMessage(text, sender, isLoading=false) {
+            const body = document.getElementById('chat-body');
+            const div = document.createElement('div');
+            div.className = `flex items-start gap-2.5 ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            let content = '';
+            if(isLoading) {
+                div.id = 'loading-bubble';
+                content = `<div class="bg-gray-200 p-3 rounded-xl text-gray-600 flex items-center gap-2"><i class="fas fa-spinner fa-spin"></i> ${text}</div>`;
+            } else {
+                const color = sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800';
+                // Markdown simples
+                const fmt = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+                content = `
+                    <div class="${sender === 'user' ? '' : 'order-first'} text-2xl ${sender === 'user' ? 'text-gray-400' : 'text-indigo-500'}">
+                        <i class="fas ${sender === 'user' ? 'fa-user-circle' : 'fa-robot'}"></i>
+                    </div>
+                    <div class="p-3 rounded-xl max-w-xl ${color}">${fmt}</div>
+                `;
+            }
+            div.innerHTML = content;
+            body.appendChild(div);
+            body.scrollTop = body.scrollHeight;
+        }
 
-        window.toggleScreen = (screenId) => {
-            ['api-screen', 'dev-screen', 'chat-screen'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-                document.getElementById(id).classList.remove('flex');
+        function removeLoading() {
+            document.getElementById('loading-bubble')?.remove();
+        }
+
+        function renderHistoryList() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            const ids = Object.keys(state.chatHistory).reverse(); // Mais recente primeiro
+            
+            if(ids.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 text-sm p-2">Sem histórico.</p>';
+                return;
+            }
+
+            ids.forEach(id => {
+                const turns = state.chatHistory[id];
+                if(turns.length > 0) {
+                    const firstQ = turns[0].text;
+                    const sub = turns[1]?.subject || 'Geral';
+                    const item = document.createElement('div');
+                    item.className = 'p-2 rounded-lg hover:bg-gray-700 cursor-pointer mb-1';
+                    item.innerHTML = `
+                        <p class="font-semibold text-white truncate text-sm">${firstQ}</p>
+                        <p class="text-xs text-gray-400">${sub}</p>
+                    `;
+                    item.onclick = () => loadChat(id);
+                    list.appendChild(item);
+                }
             });
-            const target = document.getElementById(screenId);
-            target.classList.remove('hidden');
-            target.classList.add('flex');
+        }
+
+        window.loadChat = (id) => {
+            state.activeConversationId = id;
+            showScreen('chat-conversa-screen');
+            const body = document.getElementById('chat-body');
+            body.innerHTML = '';
+            const turns = state.chatHistory[id];
+            turns.forEach(t => appendMessage(t.text, t.role));
+            // Update Headers
+            const sub = turns[1]?.subject || 'Geral';
+            state.selectedSubject = sub;
+            updateSubjectHeaders(sub);
         };
+
+        // --- Navegação e Menus ---
+        window.showScreen = (id) => {
+            ['start-screen', 'chat-initial-screen', 'chat-conversa-screen', 'dev-screen', 'config-screen'].forEach(s => {
+                document.getElementById(s).classList.add('hidden');
+                document.getElementById(s).classList.remove('flex');
+            });
+            const el = document.getElementById(id);
+            el.classList.remove('hidden');
+            el.classList.add('flex');
+            
+            // Mobile sidebar logic
+            if(window.innerWidth < 768) toggleSidebar(false);
+        };
+
+        window.toggleSidebar = (force) => {
+            const sb = document.getElementById('sidebar');
+            const ov = document.getElementById('sidebar-overlay');
+            const isOpen = !sb.classList.contains('-translate-x-full');
+            const shouldOpen = force !== undefined ? force : !isOpen;
+            
+            sb.classList.toggle('-translate-x-full', !shouldOpen);
+            ov.classList.toggle('hidden', !shouldOpen);
+        };
+
+        window.goBack = () => showScreen('start-screen');
 
         window.saveApiKey = () => {
-            const key = document.getElementById('api-key-input').value;
-            if (key) {
-                localStorage.setItem('gemini_key', key);
-                initGemini(key);
-                toggleScreen('chat-screen');
-                if(supabase) loadKnowledgeFromCloud();
+            const k = document.getElementById('api-key-input').value;
+            if(k) {
+                state.apiKey = k;
+                localStorage.setItem('geminiApiKey', k);
+                initGemini(k);
+                alert("Salvo!");
+                showScreen('start-screen');
             }
         };
 
-        window.resetChat = () => {
-            document.getElementById('chat-box').innerHTML = '';
-            addMessage('ai', 'Nova conversa iniciada. O que vamos estudar?');
+        window.showModal = (id) => {
+            document.getElementById('modal-overlay').classList.remove('hidden');
+            const m = document.getElementById(id);
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+            setTimeout(() => m.querySelector('.modal-container').classList.add('active'), 10);
         };
 
-        function initGemini(apiKey) {
-            genAI = new GoogleGenerativeAI(apiKey);
-            model = genAI.getGenerativeModel({ model: "gemini-2.5-flash"});
+        window.hideAllModals = () => {
+            document.getElementById('modal-overlay').classList.add('hidden');
+            ['subject-modal'].forEach(id => {
+                 const m = document.getElementById(id);
+                 m.classList.add('hidden');
+                 m.classList.remove('flex');
+                 m.querySelector('.modal-container').classList.remove('active');
+            });
+        };
+
+        function setupUI() {
+            // Setup Subjects
+            const subs = ['Matemática', 'Física', 'Química', 'História', 'Geral'];
+            const container = document.getElementById('subject-options');
+            subs.forEach(s => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors";
+                btn.textContent = s;
+                btn.onclick = () => {
+                    state.selectedSubject = s;
+                    updateSubjectHeaders(s);
+                    hideAllModals();
+                };
+                container.appendChild(btn);
+            });
+            
+            // Enter keys
+            document.getElementById('initial-chat-input').addEventListener('keypress', (e) => {
+                if(e.key==='Enter') startNewChat();
+            });
+            document.getElementById('chat-conversa-input').addEventListener('keypress', (e) => {
+                if(e.key==='Enter') sendMessage();
+            });
         }
 
-        function updateStatus(type, msg) {
-            const dot = document.getElementById('status-dot');
-            const text = document.getElementById('status-text');
-            text.innerText = msg;
-            if(type === 'loading') dot.className = "w-2 h-2 rounded-full bg-yellow-500 animate-pulse";
-            else if(type === 'online') dot.className = "w-2 h-2 rounded-full bg-green-500";
-            else dot.className = "w-2 h-2 rounded-full bg-red-500";
+        function updateSubjectHeaders(s) {
+            document.getElementById('subject-header-text').textContent = s;
+            document.getElementById('subject-header-text-chat').textContent = s;
+            document.getElementById('subject-btn-text').textContent = s;
+            document.getElementById('subject-btn-text-convo').textContent = s;
         }
 
-        function addMessage(role, text) {
-            const div = document.createElement('div');
-            const isUser = role === 'user';
-            div.className = `flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`;
-            div.innerHTML = `
-                <div class="w-8 h-8 rounded-full ${isUser ? 'bg-slate-300' : 'bg-indigo-600'} flex items-center justify-center flex-shrink-0">
-                    <i class="fas ${isUser ? 'fa-user text-slate-600' : 'fa-robot text-white text-xs'}"></i>
-                </div>
-                <div class="p-4 rounded-2xl shadow-sm max-w-[85%] text-sm leading-relaxed ${
-                    isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'
-                }">
-                    ${formatText(text)}
-                </div>
-            `;
-            document.getElementById('chat-box').appendChild(div);
-            document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+        function initGemini(k) {
+            genAI = new GoogleGenerativeAI(k);
         }
-
-        function addLoading() {
-            const id = 'loading-' + Date.now();
-            const div = document.createElement('div');
-            div.id = id;
-            div.className = "flex gap-3";
-            div.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-robot text-white text-xs"></i>
-                </div>
-                <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 flex gap-1 items-center">
-                    <span class="text-xs text-slate-400 mr-2">Consultando documentos...</span>
-                    <div class="w-2 h-2 bg-slate-400 rounded-full typing-dot"></div>
-                    <div class="w-2 h-2 bg-slate-400 rounded-full typing-dot"></div>
-                    <div class="w-2 h-2 bg-slate-400 rounded-full typing-dot"></div>
-                </div>
-            `;
-            document.getElementById('chat-box').appendChild(div);
-            document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
-            return id;
-        }
-
-        function removeLoading(id) { document.getElementById(id)?.remove(); }
-        function formatText(text) { return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>'); }
     </script>
 </body>
 </html>
-
